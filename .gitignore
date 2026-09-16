@@ -36,3 +36,6 @@ Desktop.ini
 # misc
 *.pem
 *.local
+
+# AI assistant workspace data (local memory / skills)
+.workbuddy/
