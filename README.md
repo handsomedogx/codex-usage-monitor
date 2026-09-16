@@ -133,7 +133,29 @@ npm run build
 npm run tauri build
 ```
 
-Rust 构建产物会生成到 `src-tauri/target/release/`。当前 `tauri.conf.json` 中的 `bundle.active` 为 `false`，因此默认会生成优化后的 Windows 可执行文件，但不会生成平台安装包；如需分发安装包，请先启用并配置 Tauri bundler。
+Rust 构建产物会生成到 `src-tauri/target/release/`，其中：
+
+- `codex-usage-monitor.exe`：优化后的可执行文件；
+- `bundle/nsis/Codex Usage Monitor_0.1.0_x64-setup.exe`：推荐普通用户使用；
+- `bundle/msi/Codex Usage Monitor_0.1.0_x64_en-US.msi`：适用于企业批量分发。
+
+产物名称中的版本号取自 `tauri.conf.json` 的 `version` 字段。
+
+### 自动发布
+
+仓库配置了 GitHub Actions 工作流 `.github/workflows/release.yml`：推送形如 `v*` 的 tag 后，会在 Windows runner 上自动编译、打包并创建 GitHub Release。
+
+```powershell
+# 先把 tauri.conf.json 里的 version 改成对应版本，例如 0.1.1
+git add .
+git commit -m "release: v0.1.1"
+git push
+
+git tag v0.1.1
+git push origin v0.1.1
+```
+
+注意 `tauri.conf.json` 里的 `version` 不带 `v` 前缀，而 tag 带。工作流也支持在 Actions 页面手动触发：此时只构建、不创建 Release，安装包从 workflow artifacts 下载，可用于在正式打 tag 前验证打包链路。
 
 ### 预览前端构建产物
 
@@ -174,7 +196,8 @@ codex-usage-monitor/
 │  ├─ capabilities/        # Tauri 权限配置
 │  ├─ icons/               # 应用图标
 │  ├─ Cargo.toml           # Rust 依赖与包配置
-│  └─ tauri.conf.json      # 窗口、构建和安全配置
+│  └─ tauri.conf.json      # 窗口、构建、打包和安全配置
+├─ .github/workflows/      # 自动发布工作流（tag 触发）
 ├─ index.html
 ├─ package.json
 ├─ package-lock.json
@@ -209,7 +232,8 @@ codex-usage-monitor/
 - 内置价格表只覆盖代码中列出的模型，且不会自动联网更新；
 - 第三方 API 的真实费用未知，只能显示 OpenAI 等价参考费用；
 - 扫描大型历史目录时耗时取决于日志数量、文件大小和磁盘性能；
-- 当前未提供导出 CSV/JSON、后台自动刷新或安装包配置。
+- 当前未提供导出 CSV/JSON 或后台自动刷新；
+- Windows 安装包未做代码签名，首次安装可能触发 SmartScreen「未知发布者」提示。
 
 ## 常见问题
 
@@ -231,4 +255,4 @@ codex-usage-monitor/
 
 ## License
 
-项目当前未提供开源许可证。在添加许可证之前，默认保留所有权利。
+[MIT](LICENSE) © 2026 handsomedogx
