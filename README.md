@@ -4,6 +4,16 @@
 
 > 所有统计都在本机完成。应用不会将会话日志上传到远程服务。
 
+## 界面预览
+
+顶部汇总 Token、请求数与估算费用，并按小时、天、周或月展示用量趋势：
+
+![用量概览与使用趋势](preview/overview.png)
+
+向下滚动可以看到来源分布、数据质量报告，以及按模型聚合的明细表：
+
+![来源、数据质量与模型明细](preview/breakdown.png)
+
 ## 功能特性
 
 - **用量概览**：统计总 Token、输入 Token、缓存输入、输出 Token、请求数与估算费用。
@@ -198,6 +208,7 @@ codex-usage-monitor/
 │  ├─ Cargo.toml           # Rust 依赖与包配置
 │  └─ tauri.conf.json      # 窗口、构建、打包和安全配置
 ├─ .github/workflows/      # 自动发布工作流（tag 触发）
+├─ preview/                # README 界面预览图
 ├─ index.html
 ├─ package.json
 ├─ package-lock.json
