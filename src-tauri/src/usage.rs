@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
+use crate::pricing::PriceTable;
 use chrono::{DateTime, Datelike, Duration, Local, NaiveDate, NaiveDateTime, TimeZone, Timelike};
 use regex::Regex;
 use serde_json::{json, Map, Value};
@@ -109,6 +110,7 @@ pub fn analyze(
     days: i32,
     from_timestamp: Option<i64>,
     to_timestamp: Option<i64>,
+    prices: &PriceTable,
 ) -> Result<Value, String> {
     let codex_home = PathBuf::from(codex_home);
     if !codex_home.is_dir() {
@@ -221,6 +223,7 @@ pub fn analyze(
             let bucket = timeline_bucket(timestamp, grain);
             timeline_usage.entry(bucket).or_default().add(tokens);
             if let Some(cost) = estimated_cost(
+                prices,
                 model,
                 Usage {
                     input: tokens.input,
@@ -246,7 +249,7 @@ pub fn analyze(
     let provider_model_rows: Vec<Value> = provider_model_entries
         .into_iter()
         .map(|((provider, model), usage)| {
-            let equivalent_cost = estimated_cost(&model, usage);
+            let equivalent_cost = estimated_cost(prices, &model, usage);
             if let Some(cost) = equivalent_cost {
                 *equivalent_cost_by_provider
                     .entry(provider.clone())
@@ -303,7 +306,7 @@ pub fn analyze(
                 "outputTokens": usage.output,
                 "requestCount": usage.requests,
                 "totalTokens": usage.total(),
-                "openAiEquivalentCostUsd": estimated_cost(&model, usage),
+                "openAiEquivalentCostUsd": estimated_cost(prices, &model, usage),
             })
         })
         .collect();
@@ -852,29 +855,14 @@ fn parse_timestamp(value: Option<&Value>) -> Option<i64> {
     None
 }
 
-fn estimated_cost(model: &str, usage: Usage) -> Option<f64> {
-    let (input_price, cached_price, output_price) = match model {
-        "gpt-6-astra" => (10.0, 1.0, 50.0),
-        "gpt-5.6-sol" | "gpt-5.6" => (5.0, 0.5, 30.0),
-        "gpt-5.6-terra" => (2.0, 0.2, 12.0),
-        "gpt-5.6-luna" => (0.2, 0.02, 1.2),
-        "gpt-5.5" | "codex-auto-review" => (5.0, 0.5, 30.0),
-        "gpt-5.4" => (2.5, 0.25, 15.0),
-        "gpt-5.4-mini" => (0.75, 0.075, 4.5),
-        "gpt-5.4-nano" => (0.2, 0.02, 1.25),
-        "gpt-5.3-codex" | "gpt-5.3-codex-spark" | "gpt-5.2" | "gpt-5.2-codex" => {
-            (1.75, 0.175, 14.0)
-        }
-        "gpt-5.1-codex" | "gpt-5.1-codex-max" | "gpt-5-codex" => (1.25, 0.125, 10.0),
-        "gpt-5.1-codex-mini" => (0.25, 0.025, 2.0),
-        _ => return None,
-    };
+fn estimated_cost(prices: &PriceTable, model: &str, usage: Usage) -> Option<f64> {
+    let price = prices.get(model)?;
     let cached = usage.cached.min(usage.input);
     let uncached = usage.input - cached;
     Some(
-        (uncached as f64 * input_price
-            + cached as f64 * cached_price
-            + usage.output as f64 * output_price)
+        (uncached as f64 * price.input
+            + cached as f64 * price.cached_input
+            + usage.output as f64 * price.output)
             / 1_000_000.0,
     )
 }
@@ -1101,6 +1089,7 @@ mod tests {
             0,
             None,
             Some(1_800_000_000),
+            &crate::pricing::defaults(),
         )
         .expect("analyze fixture");
         assert_eq!(report["filesScanned"], 1);
@@ -1111,6 +1100,45 @@ mod tests {
         assert_eq!(report["totals"]["totalTokens"], 110);
         assert_eq!(report["totals"]["requestCount"], 1);
         assert_eq!(report["byProviderModel"][0]["model"], "gpt-5.4-mini");
+
+        // A newly introduced model must use saved rates in every cost aggregation.
+        let contents = std::fs::read_to_string(&path)
+            .unwrap()
+            .replace("gpt-5.4-mini-2026-01-01", "new-model-2026-10-14");
+        std::fs::write(&path, contents).unwrap();
+        let prices = crate::pricing::validate(std::collections::BTreeMap::from([(
+            "new-model".into(),
+            crate::pricing::ModelPrice {
+                input: 2.0,
+                cached_input: 0.5,
+                output: 10.0,
+            },
+        )]))
+        .unwrap();
+        let report = analyze(
+            root.to_str().unwrap(),
+            0,
+            None,
+            Some(1_800_000_000),
+            &prices,
+        )
+        .unwrap();
+        let expected = (80.0 * 2.0 + 20.0 * 0.5 + 10.0 * 10.0) / 1_000_000.0;
+        assert_eq!(report["byProviderModel"][0]["estimatedCostUsd"], expected);
+        assert_eq!(report["byProvider"][0]["estimatedCostUsd"], expected);
+        assert_eq!(report["costSummary"]["officialEstimatedCostUsd"], expected);
+        assert_eq!(report["timeline"][0]["officialEstimatedCostUsd"], expected);
+        assert!(report["unknownPriceModels"].as_array().unwrap().is_empty());
+        let unpriced = analyze(
+            root.to_str().unwrap(),
+            0,
+            None,
+            Some(1_800_000_000),
+            &PriceTable::new(),
+        )
+        .unwrap();
+        assert!(unpriced["byProviderModel"][0]["estimatedCostUsd"].is_null());
+        assert_eq!(unpriced["unknownPriceModels"][0]["model"], "new-model");
 
         std::fs::remove_dir_all(&root).expect("remove fixture directory");
     }

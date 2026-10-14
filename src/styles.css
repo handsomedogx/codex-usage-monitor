@@ -307,6 +307,17 @@ tbody tr:hover td { background: var(--row-hover-bg); color: var(--text); }
 .date-fields input:focus { border-color: var(--field-focus); box-shadow: 0 0 0 3px var(--field-focus-ring); }
 .validation { margin-top: 10px; color: var(--validation); font-size: 11px; }
 .dialog-actions { justify-content: flex-end; gap: 8px; margin-top: 22px; }
+.pricing-dialog { width: min(820px, calc(100vw - 48px)); max-height: calc(100vh - 48px); overflow: auto; }
+.pricing-note, .pricing-path { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.pricing-path { overflow-wrap: anywhere; font-size: 10px; }
+.pricing-fields { padding: 0; margin: 0; border: 0; min-width: 0; }
+.pricing-table-scroll { max-height: 48vh; overflow: auto; }
+.pricing-table th { position: sticky; top: 0; z-index: 1; }
+.pricing-table th, .pricing-table td { padding: 8px; }
+.pricing-table input { width: 100%; min-width: 90px; padding: 8px; color: var(--text); background: var(--input-bg); border: 1px solid var(--border-strong); border-radius: 6px; }
+.pricing-table td:first-child { width: 42%; }
+.pricing-table td:first-child input { min-width: 200px; }
+.pricing-tools { display: flex; gap: 10px; margin-top: 14px; }
 .spin { animation: spin 900ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

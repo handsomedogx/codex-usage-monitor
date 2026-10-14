@@ -20,7 +20,8 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { PricingDialog } from "./PricingDialog";
 import {
   Area,
   CartesianGrid,
@@ -156,7 +157,7 @@ const COPY: Record<Language, Copy> = {
     replayExcluded: "Replay excluded",
     deferredFiles: "Deferred files",
     parseErrors: "Parse errors",
-    qualityNote: "Official cost uses the built-in public price table. Custom provider actual spend is not configured.",
+    qualityNote: "Official cost uses the configured model prices. Custom provider actual spend is not configured.",
     models: "Models",
     modelsSubtitle: "Aggregated by provider and model",
     model: "model",
@@ -218,7 +219,7 @@ const COPY: Record<Language, Copy> = {
     replayExcluded: "排除重放",
     deferredFiles: "待处理文件",
     parseErrors: "解析错误",
-    qualityNote: "官方费用使用内置公开价目表，第三方真实费用尚未配置。",
+    qualityNote: "官方费用使用配置的模型价格，第三方真实费用尚未配置。",
     models: "模型",
     modelsSubtitle: "按来源与模型聚合",
     model: "个模型",
@@ -289,6 +290,7 @@ const CHART_PALETTES: Record<Theme, {
 
 export default function App() {
   const [codexHome, setCodexHome] = useState("");
+  const [pricingOpen, setPricingOpen] = useState(false);
   const [language, setLanguage] = useState<Language>(() => (
     localStorage.getItem("codex-usage-language") === "en" ? "en" : "zh"
   ));
@@ -309,6 +311,7 @@ export default function App() {
   const initialized = useRef(false);
   const rangeMenuRef = useRef<HTMLDivElement>(null);
   const copy = COPY[language];
+  const pricingModels = useMemo(() => report?.byProviderModel.map((row) => row.model) ?? [], [report]);
 
   useEffect(() => {
     localStorage.setItem("codex-usage-language", language);
@@ -446,6 +449,9 @@ export default function App() {
           </div>
         </div>
         <div className="header-actions">
+          <button className="button button-secondary" onClick={() => setPricingOpen(true)} disabled={loading}>
+            <CircleDollarSign size={15} /> {language === "zh" ? "模型价格" : "Model pricing"}
+          </button>
           <button
             type="button"
             className="button theme-toggle"
@@ -545,6 +551,10 @@ export default function App() {
         <DetailsPanel report={report} copy={copy} language={language} />
       </main>
 
+      {pricingOpen && <PricingDialog language={language} models={pricingModels} onCancel={() => setPricingOpen(false)} onSaved={() => {
+        setPricingOpen(false);
+        handleRefresh();
+      }} />}
       {customDialogOpen && (
         <DateRangeDialog
           initialDates={customDates ?? recentDates(7)}
