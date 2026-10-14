@@ -1,6 +1,6 @@
 [package]
 name = "codex-usage-monitor"
-version = "0.1.0"
+version = "0.1.1"
 description = "A lightweight local Codex session usage monitor"
 authors = ["Codex Usage Monitor"]
 license = "MIT"
